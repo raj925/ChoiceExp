@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Advisor Choice Trial Type Demo</title>
+    <script type="text/javascript">
+        window.prolificID = 'NA';
+    </script>
+
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="../src/sha1.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/jspsych.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/plugins/jspsych-instructions.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/plugins/jspsych-html-keyboard-response.js"></script>
+    <!--local dev versions of jsPsych-->
+    <!--script src="../jsPsych/jspsych.js"></script>
+    <script src="../jsPsych/plugins/jspsych-instructions.js"></script>
+    <script src="../jsPsych/plugins/jspsych-html-keyboard-response.js"></script>
+    <script src="../jsPsych/plugins/jspsych-canvas-sliders-response.js"></script-->
+    <script src="../src/bowser.min.js"></script>
+    <script src="../src/jspsych-function-sliders-response.js"></script>
+    <script src="../src/jspsych-jas-present-advice-choice.js"></script>
+    <script src="../src/jspsych-canvas-sliders-response.js"></script>
+
+    <link rel="stylesheet" href="../style/advisorChoice.css"/>
+    <link rel="stylesheet" href="https://mjaquiery.github.io/jsPsych/css/jspsych.css"/>
+    <link rel="stylesheet" href="../style/confidenceSliders.css"/>
+    <link rel="stylesheet" href="../style/feedbackStyle.css"/>
+    <link rel="stylesheet" href="../style/debriefForm.css"/>
+</head>
+<body class="jspsych-display-element" tabindex="0" style="margin: 0; height: 100%; width: 100%;">
+    <div class="jspsych-content-wrapper" style="height: 100vh;">
+        <div id="jspsych-content" class="jspsych-content">
+            <h1 id="initHeader">Loading...</h1>
+            <p id="initText">If you continue to see this message after a couple of seconds something has gone wrong. In order to run
+                properly the experiment requires a modern browser with javascript enabled.</p>
+        </div>
+    </div>
+<script type="module">
+    import {DoubleDotGrid, Advisor, Cue, utils} from '../src/exploringSocialMetacognition.js';
+    import {AdvisorChoice, trialTypes} from "../src/advisorChoiceDefs.js";
+
+    /* Advice types:
+        1|2 = metacog
+        3|4 = strong metacog
+        5|6 = acc
+        7|8 = agg
+    */
+    let adviceTypes = [0,7,8];
+    let advisorIdDeck = utils.shuffle(utils.getSequence(1,3));
+    let advisorVoiceDeck = utils.shuffle(utils.getSequence(1,10));
+    let advisorPicDeck = utils.shuffle(utils.getSequence(1,5));
+    let args = {skipAudioPreload: true};
+    // Each advisor in a pair has one of the two colour schemes (assigned randomly)
+    let styleClassDeck = utils.shuffle(utils.getSequence(1,5));
+    let advisorListA = [
+        new Advisor(advisorIdDeck[1], adviceTypes[1], advisorVoiceDeck[1], advisorPicDeck[1],
+            styleClassDeck[1].toString(), args),
+        new Cue(advisorIdDeck[2], adviceTypes[2], advisorVoiceDeck[2], advisorPicDeck[2],
+            styleClassDeck[2].toString(), args)
+    ];
+    if (Math.random() < .5)
+        advisorListA = [advisorListA[1], advisorListA[0]];
+
+    /**
+     * The governor contains the properties which the experiment functions need to access from everywhere.
+     *
+     * The governor serves two key functions: it acts as a master object holding the disparate objects
+     * required to run the experiment (e.g. advisors, trials); and it holds miscellaneous temporary
+     * variables which are required for things such as staircasing.
+     */
+    let gov = new AdvisorChoice({
+        experimentCode: 'trialTypesDemo',
+        dotCount: 200,
+        dotDifference: 30,
+        difficultyStep: {
+            start: 3,
+            end: 1,
+            nReversals: 2
+        },
+        minimumBlockScore: 0.10,
+        advisorLists: [advisorListA],
+        advisors: [
+            advisorListA[0],
+            advisorListA[1]
+        ],
+        contingentAdvisors: [[], [], []],
+        blockCount: 2,
+        blockStructure: [
+            {
+                [trialTypes.catch]: 1
+            },
+            {
+                [trialTypes.force]: 1
+            },
+            {
+                [trialTypes.choice]: 1
+            },
+            {
+                [trialTypes.dual]: 1
+            },
+            {
+                [trialTypes.change]: 1
+            }
+        ],
+        practiceBlockStructure: [],
+        preTrialInterval: 0,
+        preStimulusInterval: 600,
+        questionnaireStack: [
+            advisorListA[0], advisorListA[1],
+            advisorListA[1], advisorListA[0]
+        ],
+        stimulusDuration: 200,
+        feedbackDuration: 200,
+        completionURL: 'https://app.prolific.ac/submissions/complete?cc=MX5PC2Z4'
+    });
+
+    // hoist gov to allow functions access
+    window.gov = gov;
+
+    gov.participantId = sha1.sha1(prolificID + performance.now().toString());
+    gov.trials = gov.getTrials();
+
+    /* create timeline */
+    let timeline = [];
+    let testCanvas =(new DoubleDotGrid(0,0,{dotWidth: 3, dotHeight:3, spacing: 100}));
+    testCanvas.w = testCanvas.displayWidth * 2 + testCanvas.spacing;
+    testCanvas.h = testCanvas.displayHeight;
+
+    /* define welcome message trial */
+    const welcome = {
+        type: 'instructions',
+        pages: [
+            "<p>Here we will see each of the trial types available, with a description of each one.</p>" +
+            "<p>You will see two boxes containing dots either side of the centre of the screen. " +
+            "Your task is to use the slider to decide which of the two boxes has the most dots.</p>"+
+            "<p>You make your decision by using the grey bars below the boxes. If you get the decision " +
+            "wrong the screen will go <span style='color: black; font-weight: bold;'>black</span> temporarily. " +
+            "If you get the decision right, it will go <span style='color: white; font-weight: bold;'>white</span>. " +
+            "Click one of the boxes and then press the 'continue' button.</p>" +
+            "<p>To help reduce distractions, we're going to use <strong>fullscreen mode</strong>.</p>" +
+            "<p>One of the advisors in this set is designated as a non-social advisor (a 'cue').</p>" +
+            "<p>Click 'next' to enter fullscreen mode and proceed.</p>"
+        ],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>{
+            gov.fullscreenMode();
+            gov.storeMiscTrialData(trial);
+        }
+    };
+
+    const introCatch = {
+        type: 'instructions',
+        pages: ["<h1>Catch trials</h1>" +
+        "<p>Catch trials do not provide an advisor. They provide an <code>advisorId</code> of 0 in the final data " +
+        "and there is no final decision phase.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introForce = {
+        type: 'instructions',
+        pages: ["<h1>Force trials</h1>" +
+        "<p>Force trials provide an advisor, but the advisor's identity is selected automatically " +
+        "and reported in the data as <code>advisorId</code>.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introChoice = {
+        type: 'instructions',
+        pages: ["<h1>Choice trials</h1>" +
+        "<p>Choice trials allow the user to choose which advisor gives them advice on the trial. " +
+        "The available choices are reported in the data as <code>choices[]</code>, " +
+        "and the decision as <code>advisorId</code>.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introDual = {
+        type: 'instructions',
+        pages: ["<h1>Dual trials</h1>" +
+        "<p>Dual trials give the user advice from two advisors. " +
+        "The advisors are reported in the data as <code>advisor0..., advisor1...</code>, " +
+        "where <code>...</code> is replaced with id, advice, etc.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introChange = {
+        type: 'instructions',
+        pages: ["<h1>Change trials</h1>" +
+        "<p>Change trials offer a default advisor, with the option to change to a different advisor " +
+        "by pressing the spacebar. " +
+        "The default advisor is reported in the data as <code>defaultAdvisor</code>, " +
+        "and the choice as <code>advisorId</code>.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introQuestionnaire = {
+        type: 'instructions',
+        pages: ["<h1>Advisor questionnaires</h1>" +
+        "<p>Questionnaires are included to elicit participant's self-reports about advisors.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const introGenTrustQ = {
+        type: 'instructions',
+        pages: ["<h1>General Trust Questionnaire</h1>" +
+        "<p>We also ask about participants' general propensity to trust.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    /* Initial response: present an initial stimulus and get a decision */
+    const initialDecision = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        prompt: '',
+        sliderCount: 1,
+        slider_prompt: [
+            'Which box has more dots?'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.initialResponse(trial)
+    };
+
+    /* Advice: present advice to the judge */
+    const advice = {
+        type: "jspsych-jas-present-advice-choice",
+        choiceFunction: (display_element, callback)=>gov.getAdvisorChoice(display_element, callback),
+        displayImageFunction: function(choice, divId) {
+            let div = document.querySelector('#' + divId);
+            if(gov.currentTrial.type === trialTypes.dual) {
+                for(let i = 0; i < 2; i++)
+                    gov.drawAdvice(div, gov.currentTrial['advisor' + i.toString() + 'id']);
+                return null;
+            }
+            let a = gov.currentAdvisor;
+            if (typeof a === 'undefined' && choice > 0 && choice < gov.advisors.length)
+                a = gov.getAdvisorById(choice);
+            if(typeof a === 'undefined')
+                return -1; // special value which tells the present-advice plugin to end early
+            gov.drawAdvice(div, a.id);
+            return a.portrait.src;
+        },
+        trial_duration: 1000,
+        playAudioFunction: function () {
+            // let div = document.querySelector('#jspsych-jas-present-advice-choice-prompt0');
+            // div.innerHTML = gov.currentAdvisor.nameHTML + ': ' + gov.adviceString;
+            //gov.currentTrial.advice.play();
+        },
+        prompt: "",
+        on_load: ()=>gov.setContentHeight(),
+        on_finish: (pluginData)=>{
+            gov.storePluginData(pluginData);
+        }
+    };
+
+    /* Final decision: repeat the initial decision phase to let the judge reconsider their response */
+    const finalDecision = {
+        type: "canvas-sliders-response",
+        stimulus: ()=>{},
+        prompt: '',
+        sliderCount: 1,
+        slider_prompt: [
+            'Which box had more dots?'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.showAdvice(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.finalResponse(trial)
+    };
+
+    /* Questionnaires to ask about how the judge feels about the advisors */
+    let order = utils.shuffle([0, 1, 2]);
+
+    const questionnaire = {
+        type: "function-sliders-response",
+        stimulus: (display_element, callback)=>gov.drawQuestionnaire(display_element, callback),
+        sliderCount: 3,
+        slider_name: utils.orderArray([
+            'Likeability',
+            'Ability',
+            'Benevolence'
+        ], order),
+        labels: utils.orderArray([
+            ['Unlikeable', 'Likeable'],
+            ['Incompetent', 'Competent'],
+            ['Not trying to help', 'Trying to help']
+        ], order),
+        slider_full_width: [true],
+        slider_arrangement: [0, 1, 2],
+        require_change: [1, 2, 3],
+        require_change_warning: utils.orderArray([
+            '<p style="color: red;">Please answer the <em>likeability</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>competence</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>helpfulness</em> question.</p>'
+        ], order),
+        special_class_names: ['questionnaire'],
+        max_warnings: 1,
+        on_load: ()=>{
+            gov.setSliderClick(false);
+            AdvisorChoice.hackQuestionnaire();
+            },
+        on_finish: (trial)=>gov.questionnaireResponse(trial)
+    };
+
+    const genTrustQuestionnaire = {
+        type: "function-sliders-response",
+        stimulus: (display_element, callback)=>{
+            display_element.classList.add('advisorChoice-questionnaire');
+            callback()
+        },
+        sliderCount: 6,
+        slider_name: [
+            "caution",
+            "limits_of_knowledge",
+            "counted_on",
+            "cooperative_working",
+            "experiences_and_abilities",
+            "personal_questions"
+        ],
+        slider_prompt: [
+            "When working with other people",
+            "When talking about the limits of their knowledge most other people",
+            "Most other people",
+            "When there is a choice, one should",
+            "When describing their experiences and abilities",
+            "Most people answer personal questions"
+        ],
+        labels: [
+            ["I have to be cautious", "I do not have to cautious"],
+            ["Tell the truth", "Lie"],
+            ["Can be counted on", "Can't be counted on"],
+            ["Work with other people", "Work alone"],
+            ["Most people tell the truth", "Most people lie"],
+            ["Honestly", "Dishonestly"]
+        ],
+        slider_full_width: [true],
+        slider_arrangement: [0,1,2,3,4,5,6],
+        require_change: [1,2,3,4,5,6,7],
+        require_change_warning: [
+            '<p style="color: red;">Please answer the <em>working with other people</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>knowledge limits</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>reliability</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>cooperative working preference</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>experiences and abilities</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>personal questions</em> question.</p>',
+        ],
+        special_class_names: ['genTrustQ'],
+        max_warnings: 1,
+        on_load: ()=>{
+            gov.setSliderClick(false);
+            AdvisorChoice.hackQuestionnaire();
+        },
+        on_finish: (trial)=>gov.genTrustQuestionnaireResponse(trial)
+    };
+
+    const catchTrial = {timeline: [initialDecision]};
+
+    const normalTrial = {timeline: [initialDecision, advice, finalDecision]};
+
+    // intro and training
+    timeline.push(welcome);
+    gov.currentTrialIndex = 0
+    timeline.push(introCatch);
+    timeline.push(catchTrial);
+    timeline.push(introForce);
+    timeline.push(normalTrial);
+    timeline.push(introChoice);
+    timeline.push(normalTrial);
+    timeline.push(introDual);
+    timeline.push(normalTrial);
+    timeline.push(introChange);
+    timeline.push(normalTrial);
+    timeline.push(introQuestionnaire);
+    timeline.push(questionnaire);
+    timeline.push(introGenTrustQ);
+    timeline.push(genTrustQuestionnaire);
+
+    /* start the experiment */
+    // browser check
+    if(bowser.a !== true) {
+        h1 = document.querySelector('#initHeader');
+        h1.innerText = 'Outdated Browser';
+        document.querySelector('#initText').innerHTML = 'Your browser is an old version which does not meet the requirements for participating in this study. Please upgrade to the latest version of your browser.';
+       h1.parentElement.appendChild(document.createElement('p')).innerHTML = 'Instructions for how to do this can be found at <a href="https://browser-update.org/update.html">https://browser-update.org/update.html</a>.';
+    } else {
+        jsPsych.init({
+            timeline: timeline,
+            on_finish: ()=>gov.drawDebriefForm()
+        });
+    }
+
+</script>
+</body>
+</html>

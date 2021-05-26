@@ -1,0 +1,396 @@
+---
+title: "Analysis script for DotTask"
+output: 
+  html_document:
+  toc: true
+  toc_float: true
+  toc_collapsed: true
+toc_depth: 3
+number_sections: true
+author: Matt Jaquiery (matt.jaquiery@psy.ox.ac.uk)
+editor_options: 
+  chunk_output_type: console
+---
+September 2018 
+
+# 0) Support ####
+
+## 0.i) Libraries ####
+```{r echo = F, results = 'hide'}
+if(!require(jsonlite)) {
+  install.packages("jsonlite")
+  library(jsonlite)
+}
+  
+if(!require(BayesFactor)) {
+  install.packages('BayesFactor')
+  library(BayesFactor)
+}
+
+if(!require(tidyverse)) {
+  install.packages('tidyverse')
+  library(tidyverse)
+}
+
+if(!require(reshape2)) {
+  install.packages('reshape2')
+  library(reshape2)
+}
+
+if(!require(lme4)) {
+  install.packages('lme4')
+  library(lme4)
+}
+
+if(!require(lsr)) {
+  install.packages('lsr')
+  library(lsr)
+}
+if(!require(knitr)) {
+  install.packages('knitr')
+  library(knitr)
+}
+```
+
+## 0.ii) Functions ####
+```{r echo = F, results = 'hide'}
+# Print the results of a t-test as we would like to see them reported in a paper
+prettyPrint <- function(results, d = NULL) {
+  es <- NULL
+  if(!is.null(d))
+    es <- paste0(' , d=', round(d,2))
+  print(paste0('t(',results$parameter,')=',round(results$statistic,2),
+               ' [',round(attr(results$conf.int, "conf.level")*100),'%CI: ',
+               round(results$conf.int[[1]],2), ', ', round(results$conf.int[[2]],2),'],',
+               ' p=',round(results$p.value,3), es))
+}
+
+# Print the mean and CIs of a vector
+printMean <- function(vector, label = 'Mean', doPrint = T, conf.int = .95, na.rm = F, decimals = 2) {
+  mu <- mean(vector, na.rm = na.rm)
+  s <- sd(vector, na.rm = na.rm)
+  n <- length(vector)
+  error <- qnorm(1-(1-conf.int)/2)*s/sqrt(n) # 95% confidence interval width
+  ci.low <- mu - error
+  ci.high <- mu + error
+  r <- round(range(vector, na.rm = na.rm), decimals)
+  print(paste0(label,'=', round(mu,decimals), ' [', round(conf.int,decimals)*100, '%CI: ',
+               round(ci.low,decimals), ', ', round(ci.high,decimals),'] [Range: ',
+               r[[1]], ', ', r[[2]], ']'))
+}
+
+# Return the advice type of an advisor for participant with row number=pid
+getAdviceTypeById <- function(aid, pid, advisor.data.frame) {
+  type <- advisor.data.frame[which(advisor.data.frame$participantId==pid),]
+  type <- type[which(type$id==aid),]
+  if (length(type) > 0)
+    return(type$adviceType)
+  return(NA)
+}
+# Return a vector of advice types for trial list t
+getAdviceType <- function (t, participant.data.frame, advisor.data.frame, forceRecalculate = FALSE) {
+  # shortcut if we already calculated this
+  if('adviceType' %in% colnames(t) && !forceRecalculate)
+    return(t$adviceType)
+  out <- vector(length=dim(t)[1])
+  for (i in seq(length(out))) {
+    if (t$advisorId[i]==0) {
+      # no advisor
+      out[i] <- NA;
+    } else {
+    pid <- t$participantId[i]
+    out[i] <- getAdviceTypeById(t$advisorId[i], pid, advisor.data.frame)
+    }
+  }
+  return(out)
+}
+
+#' Find the confidence shift in a given trial
+#' @param t trial list
+#' @param rawShift whether to report the confidence shift without adjusting for the assymetric scale
+#' @param forceRecalulate if true, simply return the appropriate column from t if it exists already
+#' @return a vector of confidence shifts for trial list t
+getConfidenceShift <- function (t, rawShift = FALSE, forceRecalculate = FALSE) {
+  scaleMaximum <- 50
+  # shortcut if we already calculated this
+  if('confidenceShift' %in% colnames(t) && !forceRecalculate)
+    return(t$confidenceShift)
+  out <- vector(length=dim(t)[1])
+  for (i in seq(length(out))) {
+    if (is.na(t$finalConfidence[i])) { # no advisor
+      out[i] <- NA
+    } else {
+      max.shift <- scaleMaximum - t$initialConfidence[i]
+      if(t$initialAnswer[i]==t$finalAnswer[i])
+        out[i] <- t$finalConfidence[i]-t$initialConfidence[i] # same side
+      else
+        out[i] <- -1 * (t$finalConfidence[i]+t$initialConfidence[i]) # switched sliders, so went to 0 on the first one
+      out[i] <- ifelse((abs(out[i]) > max.shift) & rawShift == F, max.shift*sign(out[i]), out[i])
+    }
+  }
+  return(out)
+}
+
+# Return a vector of influence for trial list t
+#' @param t trial list
+#' @param rawShift whether to report the influence without adjusting for the assymetric scale
+#' @param forceRecalulate if true, simply return the appropriate column from t if it exists already
+#' @return a vector of influence for trial list t
+getInfluence <- function (t, rawShift = FALSE, forceRecalculate = FALSE) {
+  # shortcut if we already calculated this
+  if('influence' %in% colnames(t) && !forceRecalculate)
+    return(t$influence)
+  out <- vector(length=dim(t)[1])
+  for (i in seq(length(out))) {
+    if (t$advisorId[i] == 0) { # no advisor
+      out[i] <- NA
+    } else {
+      if (t$advisorAgrees[i])
+        out[i] <- getConfidenceShift(t[i,], rawShift, forceRecalculate) # amount confidence increased
+      else
+        out[i] <- -1 * getConfidenceShift(t[i,], rawShift, forceRecalculate) # -1 * amount confidence increased
+    }
+  }
+  return(out)
+}
+
+#' Get the name of the advice type
+#' @param adviceType the advice type to fetch the name for
+#' @param long whether to return the long name
+#' @return string of the advice type, or NA by default
+getAdviceTypeName <- function(adviceType, long = FALSE) {
+  if(length(adviceType)>1) {
+    out <- NULL
+    for(aT in adviceType)
+      out <- c(out, getAdviceTypeName(aT))
+    return(out)
+  }
+  if(adviceType==adviceTypes$neutral)
+    return(ifelse(long, 'neutral', 'Ntl'))
+  if(adviceType==adviceTypes$AiC)
+    return(ifelse(long,'Agree-in-confidence', 'AiC'))
+  if(adviceType==adviceTypes$AiU)
+    return(ifelse(long,'Agree-in-uncertainty', 'AiU'))
+  if(adviceType==adviceTypes$HighAcc)
+    return(ifelse(long,'High accuracy', 'HighAcc'))
+  if(adviceType==adviceTypes$LowAcc)
+    return(ifelse(long,'Low accuracy', 'LowAcc'))
+  return(ifelse(long, 'None', NA))
+}
+```
+
+## 0.iii) Globals ####
+```{r echo = F, results = 'hide'}
+# advice types: neutral, agree-in-confidence, and agree-in-uncertainty
+adviceTypes <- list(neutral=0, AiC=3, AiU=4, HighAcc=5, LowAcc=6)
+trialTypes <- list(catch=0, force=1, choice=2)
+confidenceCategories <- list(low=0, medium=1, high=2)
+
+# Advisor questionnaire dimensions
+questionnaireDimensions <- list(accurate=1,
+                                like=2,
+                                trust=3,
+                                influence=4)
+
+# The Advisor portraits have properties which might affect ratings, so we should investigate these:
+portraitDetails <- data.frame(
+  portraitId = 1:5,
+  category = factor(c('w', 'b', 'w', 'b', 'w')),
+  blackProp = c(0, .99, 0, .99, .01),
+  age = c(28.7, 24.9, 23.3, 24.6, 23.7)
+)
+
+# styling for ggplots
+style <- theme_light() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank(),
+        legend.position = 'top')
+style.long <- style + theme(legend.position = 'none')
+```
+
+# 1) Load data  ####
+```{r echo = F, results='hide'}
+print('Load data')
+folderName <- '../DotTask/data/processed/'
+files <- list.files(folderName)
+participants <- NULL
+trials <- NULL
+advisors <- NULL
+questionnaires <- NULL
+genTrustQ <- NULL
+for (i in seq(length(files))) {
+  fileName <- paste(folderName, files[[i]], sep='/')
+  json <- readChar(fileName, file.info(fileName)$size)
+  jsonData <- fromJSON(json, simplifyVector = T, simplifyMatrix = T, simplifyDataFrame = T)
+  # store all columns in participants table except the three last 
+  # (trials, advisors, and questionnaires are stored separately)
+  # Patch for missing data in practice
+  participants <- rbind(participants, 
+                        as.data.frame(t(jsonData[!names(jsonData) %in% c('advisors', 
+                                                                         'questionnaires', 
+                                                                         'trials',
+                                                                         'generalisedTrustQuestionnaire')])))
+  # store the trials in the trials table
+  trials <- rbind(trials, jsonData$trials)
+  if(('generalisedTrustQuestionnaire' %in% names(jsonData)))
+    genTrustQ <- rbind(genTrustQ, jsonData$generalisedTrustQuestionnaire)
+}
+#rm(jsonData, files, fileName, folderName, json)
+  
+#   1.ii) Calculate utility variables ####
+print('Calculate utility variables')
+trials$initialCorrect <- trials$initialAnswer == trials$correctAnswer
+
+# Convert times to seconds since the 70 epoch
+participants$timeStart <- sapply(participants$timeStart, function(x)x[[1]]/1000)
+participants$timeEnd <- sapply(participants$timeEnd, function(x)x[[1]]/1000)
+
+# For convenience the long participant Id is shortened to a simple number:
+participants$pid <- which(as.character(participants$id) == participants$id)
+tmp <- function(x) participants$pid[which(participants$id == x)]
+trials$pid <- sapply(trials$participantId, tmp)
+genTrustQ$pid <- sapply(genTrustQ$participantId, tmp)
+
+# The first general trust question is reverse coded
+genTrustQ$answer <- as.numeric(genTrustQ$answer)
+genTrustQ$answer[genTrustQ$order==0] <- 100 - genTrustQ$answer[genTrustQ$order==0]
+
+#   1.iii) Split off real trials ####
+print('Separate real trials from practice')
+all.trials <- trials
+trials <- trials[which(!trials$practice),]
+```
+
+# 2) Demographics ####
+Demographic data are not collected and therefore not analysed
+
+
+# 3) Manipulation checks ####
+No manipulations occur so manipulation checks are not necessary.
+
+# 4) Exclusions ####
+Exclusion rules:
+
+* Proportion of correct initial judgements must be (.60 < cor1/n < .90)
+    * NB:practice trials are INCLUDED in this since they are used in part for determining confidence calibration
+* Having fewer than 3 confidence categories
+* Having fewer than 5% of trials in each confidence category
+```{r echo = F, results = 'asis'}
+participants$excluded <- sapply(participants$pid, function(pid){
+  ts <- which(all.trials$pid == pid)
+  # overall accuracy of initial decisions
+  v <- all.trials$initialAnswer[ts] == all.trials$correctAnswer[ts]
+  m <- mean(as.numeric(v), na.rm = T)
+  if(m < .6 | m > .85)
+    return('Accuracy')
+  # varied use of confidence scale
+  ts <- which(trials$pid == pid)
+  cCs <- aggregate(pid ~ confidenceCategory, data = trials[ts, ], FUN = length)
+  # All confidence categories must be used
+  if(nrow(cCs) < 3)
+    return ('Confidence')
+  # Clarify the numbers on the rules below
+  # All confidence categories must have at least 5% of the number of trials
+  if(any(cCs$pid < length(ts)*.05))
+    return('Confidence.cat')
+  return(F)
+  })
+all.participants <- participants
+participants <- participants[participants$excluded==F, ]
+# Remove excluded participants' data from other data frames
+trials <- trials[trials$pid %in% participants$pid, ]
+advisors <- advisors[advisors$pid %in% participants$pid, ]
+questionnaires <- questionnaires[questionnaires$pid %in% participants$pid, ]
+
+df.iv <- aggregate(pid ~ excluded, data = all.participants, FUN = length)
+names(df.iv) <- c('exclusionReason', 'count')
+kable(df.iv)
+```
+
+# 5) Descriptives ####
+
+## 5.i) Proportion correct ####
+```{r echo = F, results = 'asis'}
+x <- aggregate(initialCorrect ~ pid, trials, mean)$initialCorrect
+cl <- mean_cl_normal(x)
+rn <- range(x)
+df.v.i <- data.frame(target = 71,
+                     meanCorrect = cl$y, 
+                     cl95Min = cl$ymin, cl95Max = cl$ymax,
+                     rangeMin = rn[1], rangeMax = rn[2])
+df.v.i <- round(df.v.i,3)
+kable(df.v.i)
+```
+
+## 5.iii) Mean confidence ####
+
+### 5.iii.i Mean confidence by correctness
+```{r echo = F, results = 'asis'}
+df.v.iii.i <- NULL
+for(correct in list(T,F,c(T,F))) {
+  x <- aggregate(initialConfidence ~ pid, trials[trials$initialCorrect %in% correct, ], mean)
+  cl <- mean_cl_normal(x)
+  rn <- range(x)
+  df.v.iii.i <- rbind(df.v.iii.i, data.frame(correct = ifelse(length(correct)>1,'Both',correct), # hack to label total
+                                             meanConfidence = cl$y,
+                                             cl95Min = cl$ymin,
+                                             cl95Max = cl$ymax,
+                                             rangeMin = rn[1],
+                                             rangeMax = rn[2]))
+}
+df.v.iii.i[,-1] <- round(df.v.iii.i[,-1],3)
+kable(df.v.iii.i)
+```
+
+```{r eval = F}
+# 15) Examining dot difference ####
+ggplot(all.trials, aes(x = id, y = dotDifference, colour = as.factor(pid))) +
+  geom_line() +
+  geom_smooth(method = 'lm', se = F, data = all.trials[all.trials$block == max(all.trials$block), ]) +
+  scale_x_continuous(limits = c(0,249)) +
+  style.long +
+  labs(title = 'Difficulty (and trend for the final block) for plain Dot Task')
+
+
+# Cumulative accuracy plot
+df.cumAcc <- NULL
+limit <- 63
+for(pid in unique(all.trials$pid)) {
+  tmp <- all.trials[all.trials$pid == pid & all.trials$id > limit, ]
+  for(id in unique(tmp$id)) {
+    df.cumAcc <- rbind (df.cumAcc, data.frame(pid = as.factor(pid), 
+                                              id,
+                                              cumAcc = mean(tmp$initialCorrect[tmp$id<=id])))
+  }
+}
+gg.cumAcc <- ggplot(df.cumAcc, aes(x = id, y = cumAcc, colour = pid)) +
+  geom_line(alpha = 0.25) +
+  stat_summary(geom = 'line', fun.y = mean, colour = 'red') +
+  stat_summary(geom = 'ribbon', fun.data = mean_cl_normal, colour = NA, fill = 'red', alpha = 0.05) +
+  annotate(geom = 'text', label = c('Mean', 'CL95% Low', 'CL95% High'),
+           y = c(.175,.075,.025), x = 230, hjust = 1) +
+  annotate(geom = 'text', 
+           label = paste(round(mean_cl_normal(df.cumAcc$cumAcc[df.cumAcc$id==max(df.cumAcc$id)]),3)),
+           y = c(.175,.075,.025), x = 240) +
+  geom_hline(yintercept = .71, linetype = 'dashed', colour = 'black', size = 1) +
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,.05)) +
+  style.long +
+  labs(title = 'Cumulative accuracy plot for participants in the plain Dot Task')
+gg.cumAcc
+
+# 10-trial accuracy snapshots
+df.accSnap <- NULL
+for(i in seq(9,239,10)) {
+  tmp <- aggregate(initialCorrect ~ pid, 
+                   data = all.trials[all.trials$id > i, ],#%in% (i-4):(i+5), ], 
+                   FUN = mean)
+  tmp$i <- i
+  df.accSnap <- rbind(df.accSnap, tmp)
+}
+ggplot(df.accSnap, aes(x=i, y=initialCorrect, colour=as.factor(pid))) + 
+  geom_line(alpha = 0.25) +
+  stat_summary(geom = 'line', fun.y = mean, colour = 'red') +
+  stat_summary(geom = 'ribbon', fun.data = mean_cl_normal, colour = NA, fill = 'red', alpha = 0.05) +
+  geom_hline(yintercept = .71, linetype = 'dashed', colour = 'black', size = 1)
+
+```

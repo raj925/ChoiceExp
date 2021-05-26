@@ -1,0 +1,63 @@
+---
+title: "Test"
+author: "Matt Jaquiery"
+date: "13 December 2018"
+output: 
+  html_document:
+    includes:
+      after_body: toc_menu.html
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Tabset 
+
+## First Tab
+
+### Tab 1.1
+
+## Second Tab 
+
+### Tab 2.1
+
+### Tab 2.2
+
+### Tab 2.3
+
+## Third Tab 
+
+# Another Page
+
+# Another Tabset  
+
+## Another First Tab 
+
+## Second Second Tab
+
+## Second Third Tab
+
+## And
+
+## We
+
+## Can
+
+## Keep
+
+## Going
+
+### Down to Level 3
+
+### Where We Stop
+
+### By default
+
+#### So level 4 headings are there 
+
+#### But not listed!
+
+#### See the 'maxHeadingLevel' argument
+
+

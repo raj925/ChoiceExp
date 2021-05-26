@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Perceptual Decision Making Experiment</title>
+    <!--title>
+          This is the advisor choice experiment with reliability changes
+    </title> -->
+    <script type="text/javascript">
+        window.prolificID = window.location.search.match('[?&]PROLIFIC_PID=\\w+');
+        if(prolificID !== null)
+            prolificID = prolificID[0].substring(14);
+        // redirect if we don't have consent for participation
+        let consent = window.location.search.match("[?&]consent=true");
+        if(consent === null) {
+            redirectURL = "../consent.html?study=AdvisorChoice";
+            if(prolificID !== null)
+                redirectURL += "&PROLIFIC_PID=" + prolificID;
+            window.location.replace(redirectURL); // simulate redirect (no history)
+        }
+        let resumeTrial = window.location.search.match('[?&]RESUME_AT=\\w+');
+        if (resumeTrial === null)
+        {
+            resumeTrial = 0;
+        }
+        let ddSet = window.location.search.match('[?&]DD_SET=\\w+');
+        if (ddSet === null)
+        {
+            ddSet = 0;
+        }
+
+    </script>
+
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="../src/sha1.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/jspsych.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/plugins/jspsych-instructions.js"></script>
+    <script src="https://mjaquiery.github.io/jsPsych/plugins/jspsych-html-keyboard-response.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="../src/bowser.min.js"></script>
+    <script src="../src/jspsych-function-sliders-response.js"></script>
+    <script src="../src/jspsych-jas-present-advice-choice.js"></script>
+    <script src="../src/jspsych-canvas-sliders-response.js"></script>
+
+    <script src="../src/choiceData.js"></script>
+    <script src="../src/forcedData.js"></script>
+    <script src="../src/blk4Data.js"></script>
+    <script src="../src/whereDots.js"></script>
+    <script src="../src/questions.js"></script>
+    <script src="../src/mbaVars.js"></script>
+
+    <link rel="stylesheet" href="../style/advisorChoice.css"/>
+    <link rel="stylesheet" href="https://mjaquiery.github.io/jsPsych/css/jspsych.css"/>
+    <link rel="stylesheet" href="../style/confidenceSliders.css"/>
+    <link rel="stylesheet" href="../style/feedbackStyle.css"/>
+    <link rel="stylesheet" href="../style/debriefForm.css"/>
+    <link rel="shortcut icon" href="#" />
+</head>
+<body class="jspsych-display-element" tabindex="0" style="margin: 0; height: 100%; width: 100%;">
+    <div class="jspsych-content-wrapper" style="height: 100vh;">
+        <div id="jspsych-content" class="jspsych-content">
+            <h1 id="initHeader">Loading...</h1>
+            <p id="initText">If you continue to see this message after around 10 seconds, something has gone wrong. In order to run
+                properly the experiment requires a modern browser with javascript enabled.</p>
+        </div>
+    </div>
+<!-- <script type="text/javascript">
+  window.onbeforeunload = confirmExit;
+  function confirmExit()
+  {
+    return "Are you sure you want to leave this page? Your progress may not be saved.";
+  }
+</script> -->
+<script type="module">
+    import {DoubleDotGrid, Advisor, Cue, utils} from '../src/exploringSocialMetacognition.js';
+    import {AdvisorChoice, trialTypes} from "../src/advisorChoiceDefs.js";
+
+    /////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////
+
+    // MAKE CHANGES BELOW
+    // You can control the whole program for here by changing the value
+    // of the parameters here.
+
+    // (If there are comments next to the variable setting, you can change it.)
+    // (If no comments, that variable is not functional yet so LEAVE IT AS IS!)
+
+    const betaTest = true;  // If true, uses a shortened number of trials for quicker testing purposes
+    const doInstruct = true; // If true, shows instructions.
+    const doQuestionnaire = true; // If true, includes questionnaires. 
+    const demoQuestions = false; // If true, asks participants for age and gender. Stored in a private folder.
+
+    const numOfBetaTrialsPerBlock = 2; // For beta testing, this is the number of trials in each block.
+
+    const blk4ForcedTrials = true; // If true, add an extra block after practice/staircasing of just forced trials.
+
+    const numOfPracticeBlocks = 1; // How many staircasing/practice blocks do you want ppts to do?
+    const numOfExperimentalBlocks = 4; // How many regular blocks of trials do you want ppts to do?
+    const numOfPracticeTrialsPerBlock = 30; // How many trials in each practice block?
+    const numOfForcedTrialsInBlk4 = 60; // If there is a block of forced trials, how many trials?
+    const numOfChoiceTrialsPerBlock = 20; // How many choice trials in each experimental block?
+    const numOfForcedTrialsPerBlock = 40; // How many forced trials in each experimental block?
+    const numOfChangeTrialsPerBlock = 40; // How many change/default trials in each block?
+
+    const numOfDots = 200; // Number of dots in EACH grid.
+    const initialDotDifference = 15; // What the dot difference starts at (also max DD)
+                                   // So (numOfDots +/- dotdifference) in each grid.
+
+    const trialPreInterval = 400; // Number of milliseconds between trials.
+    const trialPreStim = 500; // Number of milliseconds before the stimulus (with fixation cross on screen)
+    const trialStimDuration = 160; // Number of milliseconds that the stimulus should flash up for.
+    const trialFeedbackDuration = 100; // Number of milliseconds at the end of each trial.
+    const advChangeTime = 1500; //If including change/default trials, how long do we give ppts to change advisors?
+
+    const adviceWithConfidence = false; // If true, advisors give a confidence % 
+                                     // along with their advice of left/right. 
+                                     // If false, advisors just give a left or right indication.
+
+    const wholeExpStaircasing = false;  // If true, the staircasing is applied throughout all blocks. 
+                                     // If false, staircasing only applies in the practice blocks,
+                                     // and is then fixed after those blocks.
+    const stopIfZero = false;
+    const beepIfIncorrect = false; // If true, play sound if trial is incorrect (see incorrectAudioSrc)
+    const rewardBonus = true;
+
+    const advisor1Src = 'assets/image/human.jpg'; // Filepath for advisor 1 image
+    const advisor2Src = 'assets/image/comp.jpg'; // Filepath for advisor 2 image
+    const incorrectAudioSrc = 'assets/audio/beep.mp3'; // Filepath of sound played when incorrect
+
+    const endRedirectURL = 'https://app.prolific.co/submissions/complete?cc=88EDD1C0'; //What URL to redirect to after the experiment, usually a Prolific completion URL.
+
+    // Possible future extensions: See Stim Again, Difference Advisors with/out confidence
+
+    ///////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////
+    
+    let numOfInstructFiles = 18; 
+    let advisorClass = "Cue";
+
+    const prolificID = window.location.search.match('[?&]PROLIFIC_PID=\\w+')[0].substring(14);
+
+    /* Advice types:
+        0   = balanced
+        1|2 = metacog
+        3|4 = strong metacog
+        5|6 = acc
+        7|8 = agg
+    */ 
+
+    // Creating the decks of advisors. 
+    let advisorIdDeck = [];
+    let adviceTypes = utils.shuffle([3,5,7]);
+    let advisorVoiceDeck = utils.shuffle(utils.getSequence(1,10));
+    let advisorPicDeck = utils.shuffle(utils.getSequence(1,6));
+    let args = {skipAudioPreload: true, advisorSRC1: advisor1Src, advisorSRC2: advisor2Src};
+    let practiceArgs = {skipAudioPreload: true, practice: true, advisorSRC1: advisor1Src, advisorSRC2: advisor2Src};
+    // Each advisor in a pair has one of the two colour schemes (assigned randomly)
+    let styleClassDeck = utils.shuffle(utils.getSequence(1,6));
+    if (ddSet !== 0)
+    {
+        initialDotDifference = ddSet;
+    }
+    let numOfTrainTrials;
+
+    let practiceAdvisor0;
+    let practiceAdvisor1;
+    let advisorListA;
+    let advisorListB;
+    let numTrial;
+    let mbaVarsTrain;
+    let mbaVarsAdj;
+    let mbaVarsRew;
+    let CBcondition; 
+    let files;
+    let numOfFails = 0;
+
+    let instructionFiles = [];
+
+    const dotsQs = ["The human advisor is reliable.",
+    "The human advisor is dependable.",
+    "I can trust the human advisor.",
+    "I am confident in the human advisor.",
+    "The computer advisor is reliable.",
+    "The computer advisor is dependable.",
+    "I can trust the computer advisor.",
+    "I am confident in the computer advisor.",
+    "I feel that the task was too easy.",
+    "This task would be much harder without an advisor.",
+    "I believe the human's advice was from a real person who was a past participant.",
+    "I believe the computer's advice was from a real algorithm."];
+
+    const dotsAs = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+
+
+    advisorIdDeck = [1,2];
+
+    // Set the number of [forced,choice] trials per block.
+    if (betaTest == true)
+    {
+        numTrial = [numOfBetaTrialsPerBlock,numOfBetaTrialsPerBlock];
+    }
+    else
+    {
+        numTrial = [numOfForcedTrialsPerBlock,numOfChoiceTrialsPerBlock];
+    }
+
+    // Create an array of filepaths for instruction images to show.
+    if (doInstruct == true)
+    {
+        for (let c=1;c<=numOfInstructFiles;c++)
+        {
+            let fileName = "./instructions/Slide" + c.toString() + ".jpeg";
+            instructionFiles.push(fileName);
+        }
+    }
+
+
+    // generate a block structure that looks like this:
+    // { [trialTypes.choice]: 2, [trialTypes.force]: 4 }
+    let pracBlock = [];
+    let regBlock = [];
+    let blk4 = [];
+    // We add some blocks of catch trials at the start.
+    if (betaTest == true)
+    {
+        for (let f=0;f<numOfPracticeBlocks;f++)
+        {
+            pracBlock.push({ [trialTypes.catch]: numOfBetaTrialsPerBlock });
+        }
+        numOfTrainTrials = numOfPracticeBlocks*numOfBetaTrialsPerBlock;
+        if (blk4ForcedTrials == true)
+        {
+            blk4.push({[trialTypes.forceblk4]: numOfBetaTrialsPerBlock });   
+            for (let f=0;f<numOfExperimentalBlocks;f++)
+            {
+                regBlock.push({ [trialTypes.choice]: numOfBetaTrialsPerBlock, [trialTypes.force]: numOfBetaTrialsPerBlock });
+            }
+        }
+        else
+        {
+
+            for (let f=0;f<numOfExperimentalBlocks;f++)
+            {
+                regBlock.push({ [trialTypes.choice]: numOfBetaTrialsPerBlock, [trialTypes.force]: numOfBetaTrialsPerBlock });
+            }
+        }
+    }
+    else
+    {
+        for (let f=0;f<numOfPracticeBlocks;f++)
+        {
+            pracBlock.push({ [trialTypes.catch]: numOfPracticeTrialsPerBlock });
+        }
+        numOfTrainTrials = numOfPracticeBlocks*numOfPracticeTrialsPerBlock;
+        if (blk4ForcedTrials == true)
+        {
+            blk4.push({[trialTypes.forceblk4]: numOfForcedTrialsInBlk4});
+            for (let f=0;f<numOfExperimentalBlocks;f++)
+            {
+                regBlock.push({ [trialTypes.choice]: numOfChoiceTrialsPerBlock, [trialTypes.force]: numOfForcedTrialsPerBlock });
+            }
+        }
+        else
+        {
+            for (let f=0;f<numOfExperimentalBlocks;f++)
+            {
+                regBlock.push({ [trialTypes.choice]: numOfChoiceTrialsPerBlock, [trialTypes.force]: numOfForcedTrialsPerBlock });
+            }
+        }
+    }
+
+    // Advisor is not used currently. Only the "cue" block below is entered.
+    if(advisorClass === "Advisor") {
+        practiceAdvisor0 = new Advisor(advisorIdDeck[0], 0,
+            advisorVoiceDeck[0], advisorPicDeck[0],
+            styleClassDeck[0].toString(), practiceArgs);
+        practiceAdvisor1 = new Advisor(advisorIdDeck[1], 0,
+            advisorVoiceDeck[1], advisorPicDeck[1],
+            styleClassDeck[1].toString(), practiceArgs);
+        advisorListA = [
+            new Advisor(advisorIdDeck[2], adviceTypes[1], advisorVoiceDeck[2], advisorPicDeck[2],
+                styleClassDeck[2].toString(), args),
+            new Advisor(advisorIdDeck[3], adviceTypes[1]+1, advisorVoiceDeck[3], advisorPicDeck[3],
+                styleClassDeck[3].toString(), args)
+        ];
+        advisorListB = [
+            new Advisor(advisorIdDeck[4], adviceTypes[2], advisorVoiceDeck[4], advisorPicDeck[4],
+                styleClassDeck[4].toString(), args),
+            new Advisor(advisorIdDeck[5], adviceTypes[2]+1, advisorVoiceDeck[5], advisorPicDeck[5],
+                styleClassDeck[5].toString(), args)
+        ];
+    } else { // "Cue"
+        practiceAdvisor0 = new Cue(advisorIdDeck[0], 0,
+            advisorVoiceDeck[0], advisorPicDeck[0],
+            styleClassDeck[0].toString(), practiceArgs);
+        practiceAdvisor1 = new Cue(advisorIdDeck[1], 0,
+            advisorVoiceDeck[1], advisorPicDeck[1],
+            styleClassDeck[1].toString(), practiceArgs);
+        advisorListA = [
+            new Cue(advisorIdDeck[0], adviceTypes[1], advisorVoiceDeck[2], advisorPicDeck[2],
+                styleClassDeck[1].toString(), args),
+            new Cue(advisorIdDeck[1], adviceTypes[1]+1, advisorVoiceDeck[3], advisorPicDeck[3],
+                styleClassDeck[2].toString(), args)
+        ];
+    }
+
+    if (Math.random() < .5)
+        advisorListA = [advisorListA[1], advisorListA[0]];
+
+    /**
+     * The governor contains the properties which the experiment functions need to access from everywhere.
+     *
+     * The governor serves two key functions: it acts as a master object holding the disparate objects
+     * required to run the experiment (e.g. advisors, trials); and it holds miscellaneous temporary
+     * variables which are required for things such as staircasing.
+     * We pass all those changeable parameters above into here.
+     */
+    let gov = new AdvisorChoice({
+        experimentCode: 'dual-change',
+        dotCount: numOfDots,
+        dotDifference: initialDotDifference,
+        difficultyStep: {
+            start: 1,
+            end: 1,
+            nReversals: 2
+        },
+        minimumBlockScore: 0.10,
+        advisorLists: [
+            advisorListA
+        ],
+        practiceAdvisors: [
+            practiceAdvisor0,
+            practiceAdvisor1
+        ],
+        advisors: [
+            advisorListA[0],
+            advisorListA[1]
+        ],
+        contingentAdvisors: [[], [], []],
+        blockStructure: regBlock,
+        practiceBlockStructure: pracBlock,
+        blk4Structure: blk4,
+        preTrialInterval: trialPreInterval,
+        preStimulusInterval: trialPreStim,
+        questionnaireStack: [
+            advisorListA[0], advisorListA[1],
+            advisorListA[1], advisorListA[0]
+        ],
+        stimulusDuration: trialStimDuration,
+        feedbackDuration: trialFeedbackDuration,
+        changeTime: advChangeTime,
+        completionURL: 'https://app.prolific.ac/submissions/complete?cc=MX5PC2Z4',
+        confidenceOn: adviceWithConfidence,
+        beepOn: beepIfIncorrect,
+        audioSrc: incorrectAudioSrc,
+        staircase: wholeExpStaircasing,
+        redirect: endRedirectURL,
+        CBcondition: CBcondition,
+        advisorClass
+    });
+
+    // if (ddSet !== null)
+    // {
+    //     gov.dotDifference = ddSet;
+    // }
+
+    // hoist gov to allow functions access
+    window.gov = gov;
+
+    if (prolificID !== null)
+    {
+        gov.participantId = prolificID;
+    }
+    else
+    {
+        gov.participantId = sha1.sha1((gov.timeStart).toString() + Math.random().toString());
+    }
+    gov.trials = gov.getTrials("practice");
+
+
+    /* create timeline */
+    // One timeline for training, one for experimental trials
+    let timeline = [];
+    let timelineExp = [];
+    let timelineIntro = [];
+    let testCanvas =(new DoubleDotGrid(0,0,{dotWidth: 3, dotHeight:3, spacing: 100, forcedTrials: [0], choiceTrials: [0], blkTrials: [0], trialType: 1}));
+    testCanvas.w = testCanvas.displayWidth * 2 + testCanvas.spacing;
+    testCanvas.h = testCanvas.displayHeight;
+
+    // The below blocks are for extra training and onscreen instructions.
+    // You can use these instead of the jpeg instructions by passing the blocks to the timeline.
+    // eg timelime.push(sliderInstructions)
+    // Make sure you are pushing these to the timelime at the right moment in the experiment.
+
+    /* define welcome message trial */
+    const welcome = {
+        type: 'instructions',
+        // pages: [
+        //     "Welcome to the experiment. Click 'next' to begin.",
+        //     "<p>Hello and thank you for participating in this study! " +
+        //     "In each trial of this task, you will see two boxes containing dots.</p>"+
+        //     "<p>It is your task to determine which one contains more dots. " +
+        //     "To make it easier, there will be a black cross in the middle of the screen which you must fix your gaze on as you do the task.</p>" +
+        //     "Click on the left or right side of the scale to indicate your choice and how confident you are.</p>" +
+        //     "<p>Click 'next' to enter fullscreen mode and proceed.</p>"
+        // ],
+        pages: [
+        '<img width="1000" height="700" src="./instructions/Slide1.jpeg"></img>'
+        ],
+        show_clickable_nav: true,
+        //on_load: ()=>gov.drawDemographicForm(),
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>{
+            gov.fullscreenMode();
+            gov.storeMiscTrialData(trial);
+        }
+    };
+
+    const browserInstruct = {
+        type: 'instructions',
+        pages: ["<p>Please do not use the back or forward buttons on your browser during the experiment. Data on your performance will not save until the end of the experiment so do not close your browser unless you would no longer like to participate. Thank you for cooperation!</p>" + "<p>Press Next to begin.</p>"],
+        show_clickable_nav: true,
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const rewardText = {
+        type: 'instructions',
+        pages: ["<p>In the previous block, based on your performance, you were awarded:</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.blockFeedback(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const task1Intro = {
+        type: 'instructions',
+        pages: ["<p>Thank you for your participation. You will be performing two tasks during the experiment. </p>" + "What follows are the instructions for the first task."],
+        show_clickable_nav: true,
+        on_finish: (trial)=>gov.fullscreenMode()
+    };
+
+    const task2Intro = {
+        type: 'instructions',
+        pages: ["<p>You have completed the first of the two tasks. </p>" + "What follows are the instructions for the second task."],
+        show_clickable_nav: true,
+        on_finish: (trial)=>gov.fullscreenMode()
+    };
+
+    const loadingNext = {
+        type: 'instructions',
+        pages: ["<p>Press Next to continue. This may take a few seconds to load.</p>"],
+        show_clickable_nav: true,
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+
+
+        /* define thank you message at the end of the experiment */
+    const thanks = {
+        type: 'instructions',
+        pages: [
+        '<img width="1000" height="700" src="./instructions/Slide18.jpeg"></img>'
+        ],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>{
+            gov.storeMiscTrialData(trial);
+        }
+    };
+
+    /* define welcome message trial */
+    const demo = {
+        type: 'instructions',
+        pages: [''],
+        show_clickable_nav: false,
+        on_load: ()=>gov.drawDemographicForm(),
+        on_finish: (trial)=>{
+            gov.fullscreenMode();
+            gov.storeMiscTrialData(trial);
+        }
+    };
+
+    // You can use the below instruction blocks if needed by adding them to the timeline.
+
+    const sliderInstructions = {
+        type: 'instructions',
+        pages: ["<p>You can use the slider to indicate your <strong>confidence</strong> as well. " +
+        "You do this by moving the slider more towards the edges if you are sure, and more towards the " +
+        "middle if you are unsure.</p>" +
+        "<p>E.g. if you were <strong>sure</strong> there were more dots on the <strong>left</strong>, you would move the " +
+        "slider all the way to the <strong>left</strong>.</p>" +
+        "<p>If you thought there were more dots on the <strong>right</strong>, but you were " +
+        "<strong>guessing</strong>, you would move the slider, just to the <strong>right</strong> " +
+        "of the centre.</p>" +
+        "<p>Try using the slider to indicate your confidence now.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const quickStimInstructions = {
+        type: 'instructions',
+        pages: ["<p>Good.</p>" +
+        "<p><strong>Please report your confidence reliably as possible! Do not always place the cursor in the same position and try not to be overconfident OR underconfident. Please try to use the confidence scale in a meaningful way.</strong></p>" +
+        "<p>The best strategy is to go towards the extremes of the scale only when you are truly confident or to go towards the middle only when you are truly unsure. The best wat to do this task is thus to <em>truthfully</em> report how sure you are you chose correctly using the confidence scale. </p>" +
+        "<p>From now on, <strong>the boxes will appear very briefly</strong>, so make sure you are " +
+        "concentrating or you will miss them. " +
+        "The task is difficult at first, but you will get used to it.</p>" +
+        "It helps to keep your eyes fixed where the cross appears in the middle of the screen.</p>" +
+        "<p>To try this, press 'next'.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const practiceInstructions = {
+        type: 'instructions',
+        pages: ["<p>Good.</p>" +
+        "<p>The main experiment will start after you have had a bit of practice with the task.</p>" +
+        "<p>Remember:</p>" +
+        "<p><strong> - Click on the side of the scale corresponding to the box with the most dots.</strong></p>" +
+        "<p> <strong>- Use the confidence scale appropriately and report your <em>true</em> confidence. </strong></p>" +
+        "<p> <strong>- Do not randomly guess your choice. </strong></p>" +
+        "<p> <strong>- Do not be overconfident or underconfident. Just report your <i>true</i> confidence. </strong></p>" +
+        "<p>To begin the practice, press 'next'.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.drawProgressBar(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const dualAdviceInstructions = {
+        type: 'instructions',
+        pages: ["<p>Most of the time you will get <strong>advice</strong> from advisors to help you make your " +
+        "decision.</p>" +
+        "<p>This advice is not always correct, but it is there to help you: if you use the advice you will " +
+        "perform better on the task.</p>" +
+        "<p>Once you have seen the advice you will have the opportunity to adjust your answer. <strong>" +
+        "Your previous answer</strong> is shown by a blue marker. You are free to adjust your answer to indicate " +
+        "that you are more or less sure, and even to change which box you think had most dots.</p>" +
+        "<p>Only your final position will count.</p>" +
+        "<p>Click 'next' to see an example.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const changeAdviceInstructions = {
+        type: 'instructions',
+        pages: ["<p>Sometimes you will be given a <strong>choice of advisor</strong>.</p>" +
+        "<p>Click 'next' to see an example.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const adviceInstructions = {
+        type: 'instructions',
+        pages: ["<p>The experiment will begin after you have practiced a little with advice.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const finalInstructions = {
+        type: 'instructions',
+        pages: ["<p>Excellent. You are now ready to do the experiment.</p>" +
+        "<p>Please make sure you are in a comfortable, quiet environment, and you are ready to begin.</p>" +
+        "<p>You will do some trials of the task seeing both advisors and some where you have to choose.</p>" +
+        "<p>You will no longer receive feedback on the task.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const questionStart = {
+        type: 'instructions',
+        pages: ["<p>You will first be asked a series of questions before starting the experiment.</p>" +"<p>Please answer as truthfully as possible.</p>" + "<p>Press Next to begin.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const questionEnd = {
+        type: 'instructions',
+        pages: ["<p>Please take some time to answer a few questions about the task you just did.</p>" + "<p>Please answer as truthfully as possible.</p>" + "<p>Press Next to begin.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=>gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    }
+
+    const blockBreak = {
+        type: 'instructions',
+        pages: ["<h1>Break</h1><p>You may take a moment to rest here. Please try not to rest for more than 5 minutes. Press 'next' when you are ready.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=> {
+		gov.blockFeedback();
+		gov.exportGovernor();
+	},
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const compCheckNotify = {
+        type: 'instructions',
+        pages: ["<p>To check your understanding of the task, we will now ask you some questions about the instructions you just read.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=> gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    }
+
+    const compCheckFail1 = {
+        type: 'instructions',
+        pages: ["<p>You answered one of the questions related to the instructions incorrectly.</p>" + "<p>As it is important to understand the instructions for this task, you will now see the instructions again. Please read them carefully and you will have another chance to answer the questions correctly.</p>"],
+        show_clickable_nav: true,
+        on_load: ()=> gov.fullscreenMode(),
+        on_finish: (trial)=>gov.storeMiscTrialData(trial)
+    };
+
+    const compCheckFail2 = {
+        type: 'instructions',
+        pages: ["<p>You answered one of the questions related to the instructions incorrectly.</p>" + "<p>As you have already failed to answer the comprehension questions correctly, you will no longer be able to participate in this experiment.</p>" +
+        "Please return your submission in Prolific."],
+        show_clickable_nav: false,
+        on_load: ()=> gov.fullscreenMode(),
+        on_finish: (trial)=>
+        {
+            gov.endExperiment(true,false);
+            document.querySelector('body').innerHTML = "";
+        }
+    };
+
+
+    /* Initial response: present an initial stimulus and get a decision */
+    const introInitialDecision = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: null,
+        prompt: '',
+        sliderCount: 1,
+        labels: [
+            ['Sure LEFT', 'Sure RIGHT']
+        ],
+        slider_prompt: [
+        ''
+            //'<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.checkIntroResponse(trial)
+    };
+
+    /* Initial response: present an initial stimulus and get a decision */
+    const practiceInitialDecision = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        prompt: '',
+        sliderCount: 1,
+        labels: [
+            ['Sure LEFT', 'Sure RIGHT']
+        ],
+        slider_prompt: [
+            '<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.initialResponse(trial)
+    };
+
+    /* Initial response: ensure advisor will always give correct answer */
+    const advisorIntroInitialDecision = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        prompt: '',
+        sliderCount: 1,
+        labels: [
+            ['Sure LEFT', 'Sure RIGHT']
+        ],
+        slider_prompt: [
+            '<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.initialResponse(trial, {advisorAlwaysCorrect: true})
+    };
+
+    /* Initial response: present an initial stimulus and get a decision */
+    const initialDecisionDelay = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        prompt: '',
+        sliderCount: 1,
+        slider_prompt: [
+            '<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        post_trial_gap:700,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>gov.initialResponse(trial)
+    };
+
+    /* Initial response: present an initial stimulus and get a decision */
+    const initialDecision = {
+        type: "canvas-sliders-response",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        prompt: '',
+        sliderCount: 1,
+        slider_prompt: [
+            '<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        on_load: ()=>gov.setSliderClick(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>
+	{
+	 gov.initialResponse(trial);
+	 gov.fullscreenMode();
+	}
+    };
+
+    /* Advice: present advice to the judge */
+    const advice = {
+        type: "jspsych-jas-present-advice-choice",
+        choiceFunction: (display_element, callback)=>gov.getAdvisorChoice(display_element, callback),
+        displayImageFunction: function(choice, divId) {
+            let div = document.querySelector('#' + divId);
+            if(gov.currentTrial.type === trialTypes.dual) {
+                for(let i = 0; i < 2; i++)
+                    gov.drawAdvice(div, gov.currentTrial['advisor' + i.toString() + 'id']);
+                return null;
+            }
+            let a = gov.currentAdvisor;
+            if (typeof a === 'undefined' && choice > 0 && choice < gov.advisors.length)
+                a = gov.getAdvisorById(choice);
+            if(typeof a === 'undefined')
+                return -1; // special value which tells the present-advice plugin to end early
+            gov.drawAdvice(div, a.id);
+            return a.portrait.src;
+        },
+        trial_duration: 1000,
+        playAudioFunction: function () {
+            // let div = document.querySelector('#jspsych-jas-present-advice-choice-prompt0');
+            // div.innerHTML = gov.currentAdvisor.nameHTML + ': ' + gov.adviceString;
+            //gov.currentTrial.advice.play();
+        },
+        prompt: "",
+        on_load: ()=>gov.setContentHeight(),
+        on_finish: (pluginData)=>{
+            gov.storePluginData(pluginData);
+        }
+    };
+
+    const adviceWithStim = {
+        type: "jspsych-jas-present-advice-choice",
+        stimulus: (canvasId)=>gov.drawDots(canvasId),
+        stimulus_duration: gov.preTrialInterval + gov.preStimulusInterval + gov.stimulusDuration,
+        hideFunction: (canvasContainer)=>gov.maskDots(canvasContainer),
+        choiceFunction: (display_element, callback)=>gov.getAdvisorChoice(display_element, callback),
+        displayImageFunction: function(choice, divId) {
+            let div = document.querySelector('#' + divId);
+            if(gov.currentTrial.type === trialTypes.dual) {
+                for(let i = 0; i < 2; i++)
+                    gov.drawAdvice(div, gov.currentTrial['advisor' + i.toString() + 'id']);
+                return null;
+            }
+            let a = gov.currentAdvisor;
+            if (typeof a === 'undefined' && choice > 0 && choice < gov.advisors.length)
+                a = gov.getAdvisorById(choice);
+            if(typeof a === 'undefined')
+                return -1; // special value which tells the present-advice plugin to end early
+            gov.drawAdvice(div, a.id);
+            return a.portrait.src;
+        },
+        trial_duration: 1000,
+        playAudioFunction: function () {
+            // let div = document.querySelector('#jspsych-jas-present-advice-choice-prompt0');
+            // div.innerHTML = gov.currentAdvisor.nameHTML + ': ' + gov.adviceString;
+            //gov.currentTrial.advice.play();
+        },
+        prompt: "",
+        on_load: ()=>gov.setContentHeight(),
+        on_finish: (pluginData)=>{
+            gov.storePluginData(pluginData);
+        }
+    };
+
+    /* Final decision: repeat the initial decision phase to let the judge reconsider their response */
+    const finalDecision = {
+        type: "canvas-sliders-response",
+        stimulus: ()=>{},
+        prompt: '',
+        sliderCount: 1,
+        slider_prompt: [
+            '<p>Left click on the slider, click Continue to confirm.</p>'
+        ],
+        slider_name: [
+            'answer'
+        ],
+        reversed: [false],
+        slider_full_width: [true],
+        slider_col_spacing: [0],
+        exclusive_group: [1],
+        require_change: [1],
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        post_trial_gap:700,
+        on_load: ()=>gov.showAdvice(),
+        check_response: (trialresponse)=>gov.checkResponse(trialresponse),
+        on_finish: (trial)=>{
+            gov.finalResponse(trial);
+            gov.fullscreenMode();
+        }
+    };
+
+    /* Feedback shows a tick on the target box */
+    const feedbackDisplay = {
+        type: "canvas-sliders-response",
+        stimulus: ()=>{},
+        // Use below if you want to show whether the trial was correct/wrong after an answer is given.
+        stimulus: (canvasId)=>{gov.showTrialFeedback(canvasId);},
+        prompt: '',
+        sliderCount: 0,
+        canvasWidth: testCanvas.w,
+        canvasHeight: testCanvas.h,
+        trial_duration: gov.feedbackDuration
+    };
+
+    /* Questionnaires to ask about how the judge feels about the advisors */
+    let order = utils.shuffle([0, 1, 2]);
+
+    const questionnaireProspective = gov.advisorClass === "Advisor"?
+        {
+            type: "function-sliders-response",
+                stimulus: (display_element, callback)=>gov.drawQuestionnaire(display_element, callback),
+            prompt: '<p>This advisor will be...</p>',
+            sliderCount: 3,
+            slider_name: utils.orderArray([
+                'Likeability',
+                'Ability',
+                'Benevolence'
+            ], order),
+            labels: utils.orderArray([
+                ['Unlikeable', 'Likeable'],
+                ['Incompetent', 'Competent'],
+                ['Not trying to help', 'Trying to help']
+            ], order),
+            slider_full_width: [true],
+            slider_arrangement: [0, 1, 2],
+            require_change: [0, 1, 2],
+            require_change_warning: utils.orderArray([
+                '<p style="color: red;">Please answer the <em>likeability</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>competence</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>helpfulness</em> question.</p>'
+            ], order),
+            special_class_names: ['questionnaire'],
+            max_warnings: 1,
+            on_load: ()=>{
+                gov.setSliderClick(false);
+                AdvisorChoice.hackQuestionnaire();
+            },
+            on_finish: (trial)=>gov.questionnaireResponse(trial)
+        } : // "Cue"
+        {
+            type: "function-sliders-response",
+            stimulus: (display_element, callback)=>gov.drawQuestionnaire(display_element, callback),
+            prompt: '<p>This cue will be...</p>',
+            sliderCount: 3,
+            slider_name: utils.orderArray([
+                'Desirability',
+                'Accuracy',
+                'Helpfulness'
+            ], order),
+            labels: utils.orderArray([
+                ['Unwanted', 'Wanted'],
+                ['Inaccurate', 'Accurate'],
+                ['Misleading', 'Helpful']
+            ], order),
+            slider_full_width: [true],
+            slider_arrangement: [0, 1, 2],
+            require_change: [0, 1, 2],
+            require_change_warning: utils.orderArray([
+                '<p style="color: red;">Please answer the <em>desirability</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>accuracy</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>helpfulness</em> question.</p>'
+            ], order),
+            special_class_names: ['questionnaire'],
+            max_warnings: 1,
+            on_load: ()=>{
+                gov.setSliderClick(false);
+                AdvisorChoice.hackQuestionnaire();
+            },
+            on_finish: (trial)=>gov.questionnaireResponse(trial)
+        };
+
+
+    const questionnaire = gov.advisorClass === "Advisor"?
+        {
+            type: "function-sliders-response",
+            stimulus: (display_element, callback)=>gov.drawQuestionnaire(display_element, callback),
+            prompt: '<p>This advisor is...</p>',
+            sliderCount: 3,
+            slider_name: utils.orderArray([
+                'Likeability',
+                'Ability',
+                'Benevolence'
+            ], order),
+            labels: utils.orderArray([
+                ['Unlikeable', 'Likeable'],
+                ['Incompetent', 'Competent'],
+                ['Not trying to help', 'Trying to help']
+            ], order),
+            slider_full_width: [true],
+            slider_arrangement: [0, 1, 2],
+            require_change: [0, 1, 2],
+            require_change_warning: utils.orderArray([
+                '<p style="color: red;">Please answer the <em>likeability</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>competence</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>helpfulness</em> question.</p>'
+            ], order),
+            special_class_names: ['questionnaire'],
+            max_warnings: 1,
+            on_load: ()=>{
+                gov.setSliderClick(false);
+                AdvisorChoice.hackQuestionnaire();
+            },
+            on_finish: (trial)=>gov.questionnaireResponse(trial)
+        } : // "Cue"
+        {
+            type: "function-sliders-response",
+            stimulus: (display_element, callback)=>gov.drawQuestionnaire(display_element, callback),
+            prompt: '<p>This cue is...</p>',
+            sliderCount: 3,
+            slider_name: utils.orderArray([
+                'Desirability',
+                'Accuracy',
+                'Helpfulness'
+            ], order),
+            labels: utils.orderArray([
+                ['Unwanted', 'Wanted'],
+                ['Inaccurate', 'Accurate'],
+                ['Misleading', 'Helpful']
+            ], order),
+            slider_full_width: [true],
+            slider_arrangement: [0, 1, 2],
+            require_change: [0, 1, 2],
+            require_change_warning: utils.orderArray([
+                '<p style="color: red;">Please answer the <em>desirability</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>accuracy</em> question.</p>',
+                '<p style="color: red;">Please answer the <em>helpfulness</em> question.</p>'
+            ], order),
+            special_class_names: ['questionnaire'],
+            max_warnings: 1,
+            on_load: ()=>{
+                gov.setSliderClick(false);
+                AdvisorChoice.hackQuestionnaire();
+            },
+            on_finish: (trial)=>gov.questionnaireResponse(trial)
+        };
+
+    const genTrustQuestionnaire = {
+        type: "function-sliders-response",
+        stimulus: (display_element, callback)=>{callback()},
+        sliderCount: 6,
+        slider_name: [
+            "caution",
+            "limits_of_knowledge",
+            "counted_on",
+            "cooperative_working",
+            "experiences_and_abilities",
+            "personal_questions"
+        ],
+        slider_prompt: [
+            "When working with other people",
+            "When talking about the limits of their knowledge most other people",
+            "Most other people",
+            "When there is a choice, one should",
+            "When describing their experiences and abilities",
+            "Most people answer personal questions"
+        ],
+        labels: [
+            ["I have to be cautious", "I do not have to cautious"],
+            ["Tell the truth", "Lie"],
+            ["Can be counted on", "Can't be counted on"],
+            ["Work with other people", "Work alone"],
+            ["Most people tell the truth", "Most people lie"],
+            ["Honestly", "Dishonestly"]
+        ],
+        slider_full_width: [true],
+        slider_arrangement: [0,1,2,3,4,5,6],
+        require_change: [1,2,3,4,5,6,7],
+        require_change_warning: [
+            '<p style="color: red;">Please answer the <em>working with other people</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>knowledge limits</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>reliability</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>cooperative working preference</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>experiences and abilities</em> question.</p>',
+            '<p style="color: red;">Please answer the <em>personal questions</em> question.</p>',
+        ],
+        special_class_names: ['genTrustQ'],
+        max_warnings: 1,
+        on_load: ()=>{
+            gov.setSliderClick(false);
+            AdvisorChoice.hackQuestionnaire();
+        },
+        on_finish: (trial)=>gov.genTrustQuestionnaireResponse(trial)
+    };
+
+    const radQs = {
+        type: 'instructions',
+        pages: [''],
+        show_clickable_nav: false,
+        on_load: ()=>gov.drawRadioQuestionnaire(["Does this work?","How about this?"],["Yes", "Maybe", "Not Quite", "No"],"test"),
+        on_finish: (trial)=>{
+            gov.fullscreenMode();
+            gov.storeMiscTrialData(trial);
+        }
+    };
+
+    const attCheckQs = {
+        type: 'instructions',
+        pages: [''],
+        show_clickable_nav: false,
+        on_load: ()=>{
+            gov.attentionCheckQuestionnaire(attQs,[att1As,att2As,att3As],"Comprehension Check",attCorr)
+        },
+        on_finish: (trial)=>{
+                gov.fullscreenMode();
+                gov.storeMiscTrialData(trial);
+        }
+    };
+
+
+    const procedures_feedback = {
+        //feedbackDisplay removed for now from arrays.
+        [trialTypes.catch]: [initialDecisionDelay],
+        [trialTypes.force]: [initialDecision, advice, finalDecision],
+        [trialTypes.choice]: [initialDecision, advice, finalDecision],
+        [trialTypes.dual]: [initialDecision, advice, finalDecision],
+        [trialTypes.change]: [initialDecision, advice, finalDecision],
+        [trialTypes.forceblk4]: [initialDecision, advice, finalDecision],
+        [trialTypes.preadvice]: [advice, initialDecision],
+        [trialTypes.postadvice]: [adviceWithStim, finalDecision]
+    };
+    const procedures = {
+        [trialTypes.catch]: [initialDecision],
+        [trialTypes.force]: [initialDecision, advice, finalDecision],
+        [trialTypes.choice]: [initialDecision, advice, finalDecision],
+        [trialTypes.dual]: [initialDecision, advice, finalDecision],
+        [trialTypes.change]: [initialDecision, advice, finalDecision],
+        [trialTypes.forceblk4]: [initialDecision, advice, finalDecision],
+        [trialTypes.preadvice]: [advice, initialDecision],
+        [trialTypes.postadvice]: [adviceWithStim, finalDecision]
+
+    };
+
+    let trainingTrials = utils.getMatches(gov.trials, function(trial) {
+        return trial.block < 2;
+    });
+
+    gov.currentTrialIndex = 0
+    // intro and training
+
+    if (demoQuestions == true)
+    {
+        timeline.push(demo);
+    }
+
+    timeline.push(browserInstruct);
+
+    var attCheckFailNode1 = {
+        timeline: [compCheckFail1],
+        conditional_function: function(){
+            if (attCheck == true && numOfFails == 1)
+            {
+                return false;
+            }
+            else if (attCheck == true && numOfFails == 0)
+            {
+                numOfFails = 1;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+    
+
+    var attCheckFailNode2 = {
+        timeline: [compCheckFail2],
+        conditional_function: function(){
+            if (attCheck == true && numOfFails == 1)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+
+    timeline.push(attCheckFailNode1);
+
+    let introIdx;
+
+    if (doInstruct == true)
+    {
+        files = [];
+        for (let n = 0;n<11;n++)
+        {
+            files.push('<img width="1000" height="700" src="./instructions/Slide' + (n+1).toString() + '.jpeg"></img>');
+        }
+        timeline.push({
+            type: 'instructions',
+            pages: files,
+            show_clickable_nav: true,
+            allow_backward: true,
+            button_label_previous: 'Previous',
+            on_finish: (trial)=>{
+                gov.fullscreenMode();
+                gov.storeMiscTrialData(trial);
+            }
+        });
+
+        timeline.push(compCheckNotify);
+        timeline.push(attCheckQs);
+        timeline.push(attCheckFailNode2);
+
+        introIdx = timeline.length-1;
+
+        var attCheckNode = {
+            timeline: timeline.slice(1,introIdx+1),
+            conditional_function: function(){
+                return attCheck;
+            }
+        }
+
+        timeline.push(attCheckNode)
+
+        files = [];
+        files.push('<img width="1000" height="700" src="./instructions/Slide' + (12).toString() + '.jpeg"></img>');
+        timeline.push({
+            type: 'instructions',
+            pages: files,
+            show_clickable_nav: true,
+            on_finish: (trial)=>{
+                gov.fullscreenMode();
+                gov.storeMiscTrialData(trial);
+            }
+        });
+
+    }
+
+    else
+    {
+        timeline.push(welcome);
+    }
+
+
+    // fill in the remaining non-advisor practice blocks
+    for(let b=0; b < 2; b++) {
+        // find trials in this block
+        let trials = utils.getMatches(trainingTrials, function(trial) {
+            return trial.block === b;
+        });
+        // add the trials selecting the appropriate procedure for the trial type
+        while(trials.length)
+            timeline.push({timeline: procedures_feedback[trials.shift().type]});
+        timeline.push(blockBreak);
+    }
+
+    // practice with advisor
+    let advisorTrainingTrials = utils.getMatches(gov.trials, function(trial) {
+        return trial.block >= 2 && trial.practice;
+    });
+
+    let forcedblk4Trials = utils.getMatches(gov.trials, function(trial) {
+        return trial.type == 5;
+    });
+
+    // fill in the rest
+    for(let b=2; b < gov.practiceBlockStructure.length; b++) {
+        // find trials in this block
+        let trials = utils.getMatches(advisorTrainingTrials, function(trial) {
+            return trial.block === b;
+        });
+        if(trials != null && trials.length > 0) {
+            // add the trials selecting the appropriate procedure for the trial type
+            while(trials.length)
+                timeline.push({timeline: procedures_feedback[trials.shift().type]});
+            timeline.push(blockBreak);
+        }
+    }
+
+    // Sanity check below so you can see the structure of the experiment created at the start.
+    //console.log(timeline);
+    timeline.pop();
+    timeline.push(loadingNext);
+    let startingIdx = timeline.length;
+
+    /* start the experiment */
+    // browser check
+    if(bowser.a !== true) {
+        h1 = document.querySelector('#initHeader');
+        h1.innerText = 'Outdated Browser';
+        document.querySelector('#initText').innerHTML = 'Your browser is an old version which does not meet the requirements for participating in this study. Please upgrade to the latest version of your browser.';
+       h1.parentElement.appendChild(document.createElement('p')).innerHTML = 'Instructions for how to do this can be found at <a href="https://browser-update.org/update.html">https://browser-update.org/update.html</a>.';
+    } 
+
+    else if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|BB|PlayBook|IEMobile|Windows Phone|Kindle|Silk|Opera Mini/i.test(navigator.userAgent)) {
+        h1 = document.querySelector('#initHeader');
+        h1.innerText = 'Mobile Device Detected';
+        document.querySelector('#initText').innerHTML = 'This study currently does not support mobile devices. Please complete the study on a desktop computer or laptop.';
+    }
+
+        jsPsych.init({
+            timeline: timeline,
+            preload_images: instructionFiles,
+            on_finish: (trial)=>{
+                gov.fullscreenMode();
+                gov.trials = (gov.trials).concat(gov.getTrials("experimental"));
+                let forcedblk4Trials = utils.getMatches(gov.trials, function(trial) {
+                    return trial.type == 5;
+                });
+                // real experiment
+                if (blk4ForcedTrials == true)
+                {
+                    if (doInstruct == true)
+                    {
+                        files = [];
+                        for (let n = 18;n<22;n++)
+                        {
+                            files.push('<img width="1000" height="700" src="./instructions/Slide' + (n+1).toString() + '.jpeg"></img>');
+                        }
+                        timeline.push({
+                            type: 'instructions',
+                            pages: files,
+                            show_clickable_nav: true,
+                            allow_backward: true,
+                            on_finish: (trial)=>{
+                                gov.fullscreenMode();
+                                gov.storeMiscTrialData(trial);
+                            }
+                        });
+                    }
+                    for (let a=0; a<gov.advisorLists.length; a++) 
+                    {
+                        
+                        let trials = utils.getMatches(forcedblk4Trials, function(trial) 
+                        {
+                            return trial.block === gov.practiceBlockStructure.length;
+                        });
+
+                        // add the trials selecting the appropriate procedure for the trial type
+                        while(trials.length)
+                        {
+                            timeline.push({timeline: procedures[trials.shift().type]});
+                        }
+                        timeline.push(blockBreak);
+
+                    }
+
+                    if (doInstruct == true)
+                    {
+                        files = [];
+                        for (let n = 12;n<17;n++)
+                        {
+                            files.push('<img width="1000" height="700" src="./instructions/Slide' + (n+1).toString() + '.jpeg"></img>');
+                        }
+                        timeline.push({
+                            type: 'instructions',
+                            pages: files,
+                            show_clickable_nav: true,
+                            allow_backward: true,
+                            on_finish: (trial)=>{
+                                gov.fullscreenMode();
+                                gov.storeMiscTrialData(trial);
+                            }
+                        });
+                    }
+                }
+
+                for (let a=0; a<gov.advisorLists.length; a++) 
+                {
+                    // real experiment
+                    if (blk4ForcedTrials == true)
+                    {
+                        for (let b=1; b<=gov.blockStructure.length; b++) {
+                            // find trials in this block
+                            let trials = utils.getMatches(gov.trials, function(trial) {
+                                return trial.block === b + gov.practiceBlockStructure.length;
+                            });
+                            // add the trials selecting the appropriate procedure for the trial type
+                            while(trials.length)
+                            {
+                                timeline.push({timeline: procedures[trials.shift().type]});
+                            }
+                            timeline.push(blockBreak);
+                        }
+                        
+                    }
+                    else
+                    {
+                        if (doInstruct == true && blk4ForcedTrials == false)
+                        {    
+                            files = [];
+                            for (let n = 12;n<17;n++)
+                            {
+                                files.push('<img width="1000" height="700" src="./instructions/Slide' + (n+1).toString() + '.jpeg"></img>');
+                            }
+                            timeline.push({
+                                type: 'instructions',
+                                pages: files,
+                                show_clickable_nav: true,
+                                allow_backward: true,
+                                on_finish: (trial)=>{
+                                    gov.fullscreenMode();
+                                    gov.storeMiscTrialData(trial);
+                                }
+                            });
+                        }
+
+                        for (let b=0; b<gov.blockStructure.length; b++) {
+                            // find trials in this block
+                            let trials = utils.getMatches(gov.trials, function(trial) {
+                                return trial.block === b + gov.practiceBlockStructure.length;
+                            });
+                            // add the trials selecting the appropriate procedure for the trial type
+                            while(trials.length)
+                            {
+                                timeline.push({timeline: procedures[trials.shift().type]});
+                            }
+                                
+                            timeline.push(blockBreak);
+                        }
+                    }
+
+                    // Get rid of residual trials.
+                    //for (let t=0;t<numTrial[0]+numTrial[1]+1;t++)
+                    //{ 
+                    //     timeline.pop();
+                    //}
+
+                }
+
+            console.log(gov.trials);
+            console.log(timeline);
+            let endIdx = timeline.length-1;
+
+            jsPsych.init({
+                timeline: timeline.slice(startingIdx,endIdx),
+                preload_images: instructionFiles,
+                on_finish: (trial)=>{
+                if (doQuestionnaire == true)
+                    {
+                        timeline.push(questionEnd);
+                        timeline.push({
+                                type: 'instructions',
+                                pages: [''],
+                                show_clickable_nav: false,
+                                on_load: ()=>gov.drawRadioQuestionnaire(utils.shuffle(dotsQs),dotsAs,"Post-Dots Questions"),
+                                on_finish: (trial)=>{
+                                    gov.fullscreenMode();
+                                    gov.storeMiscTrialData(trial);
+				    gov.exportGovernor();	
+                                }
+                            });
+
+                    }
+
+                    jsPsych.init({
+                    timeline: timeline.slice(endIdx,timeline.length),
+                        on_finish: (trial)=>{
+                            gov.drawDebriefForm();
+			    gov.exportGovernor();	
+                    }
+                    });
+                }});
+            }});
+</script>
+</body>
+</html>
